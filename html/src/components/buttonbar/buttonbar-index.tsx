@@ -1,6 +1,6 @@
 import { h, Component } from 'preact';
 import './buttonbar.scss';
-
+// by Aico 20260526
 const STORAGE_KEY = 'ttyd_custom_buttons';
 
 export interface ButtonConfig {
