@@ -7,10 +7,19 @@ body {
 }
 
 #terminal-container {
-  width: auto;
+  width: 100%;
   height: 100%;
-  margin: 0 auto;
+  margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ttyd-terminal-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
   .terminal {
     padding: 5px;
     height: calc(100% - 10px);
