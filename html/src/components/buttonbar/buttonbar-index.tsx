@@ -57,31 +57,29 @@ function genId(): string {
  *   \cC →  same as ^C
  *   Ctrl+C / ctrl+c  → 0x03  (human-friendly syntax)
  */
+function ctrlChar(ch: string): string {
+    if (ch === '@') return '\x00';
+    const code = ch.toUpperCase().charCodeAt(0);
+    // A-Z=65-90 -> ctrl 1-26; special: [=91->27, \=92->28, ]=93->29, ^=94->30, _=95->31
+    if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
+    return ch;
+}
+
 function parseCommand(cmd: string): string {
-    // First handle Ctrl+X human syntax (case-insensitive)
-    // e.g. "Ctrl+C", "ctrl+c", "CTRL+Z"
-    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+([A-Za-z@[\\\]^_])/g, (_m, ch: string) => {
-        const code = ch.toUpperCase().charCodeAt(0);
-        // Ctrl+A=1 ... Ctrl+Z=26, Ctrl+[=27, Ctrl+\=28, Ctrl+]=29, Ctrl+^=30, Ctrl+_=31, Ctrl+@=0
-        if (ch === '@') return '\x00';
-        if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-        return ch;
-    });
+    // Ctrl+C / ctrl+c syntax
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+([A-Za-z@^_])/g, (_m, ch: string) => ctrlChar(ch));
+    // Also handle Ctrl+[ Ctrl+\ Ctrl+] via literal string check
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+\[/g, '\x1b');
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+\\/g, '\x1c');
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+\]/g, '\x1d');
 
-    // \cX notation  e.g. \cC
-    cmd = cmd.replace(/\\c([A-Za-z@[\\\]^_])/g, (_m, ch: string) => {
-        const code = ch.toUpperCase().charCodeAt(0);
-        if (ch === '@') return '\x00';
-        if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-        return ch;
-    });
+    // \cX notation: \cC
+    cmd = cmd.replace(/\\c([A-Za-z@^_])/g, (_m, ch: string) => ctrlChar(ch));
 
-    // ^X caret notation  e.g. ^C  (only when ^ is at start or after whitespace to avoid false positives)
-    cmd = cmd.replace(/\^([A-Za-z@[\\\]^_])/g, (_m, ch: string) => {
-        const code = ch.toUpperCase().charCodeAt(0);
-        if (ch === '@') return '\x00';
-        if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-        return '^' + ch;
+    // ^X caret notation: ^C
+    cmd = cmd.replace(/\^([A-Za-z@^_])/g, (_m, ch: string) => {
+        const result = ctrlChar(ch);
+        return result.charCodeAt(0) < 32 ? result : '^' + ch;
     });
 
     // Standard escapes
