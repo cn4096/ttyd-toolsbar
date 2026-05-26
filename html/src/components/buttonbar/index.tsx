@@ -30,14 +30,18 @@ function loadButtons(): ButtonConfig[] {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) return JSON.parse(raw) as ButtonConfig[];
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
     return [];
 }
 
 function saveButtons(buttons: ButtonConfig[]) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(buttons));
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
 }
 
 function genId(): string {
@@ -53,31 +57,29 @@ function genId(): string {
  *   \cC →  same as ^C
  *   Ctrl+C / ctrl+c  → 0x03  (human-friendly syntax)
  */
+function ctrlChar(ch: string): string {
+    if (ch === '@') return '\x00';
+    const code = ch.toUpperCase().charCodeAt(0);
+    // A-Z=65-90 -> ctrl 1-26; [=91->27, backslash=92->28, ]=93->29, ^=94->30, _=95->31
+    if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
+    return ch;
+}
+
 function parseCommand(cmd: string): string {
-    // First handle Ctrl+X human syntax (case-insensitive)
-    // e.g. "Ctrl+C", "ctrl+c", "CTRL+Z"
-    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+([A-Za-z@\[\\\]^_])/g, (_m, ch: string) => {
-        const code = ch.toUpperCase().charCodeAt(0);
-        // Ctrl+A=1 ... Ctrl+Z=26, Ctrl+[=27, Ctrl+\=28, Ctrl+]=29, Ctrl+^=30, Ctrl+_=31, Ctrl+@=0
-        if (ch === '@') return '\x00';
-        if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-        return ch;
-    });
+    // Ctrl+C / ctrl+c syntax
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+([A-Za-z@^_])/g, (_m, ch: string) => ctrlChar(ch));
+    // Also handle Ctrl+[ Ctrl+\ Ctrl+] via literal string check
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll][+][[]/, '\x1b');
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+\\/g, '\x1c');
+    cmd = cmd.replace(/[Cc][Tt][Rr][Ll]\+\]/g, '\x1d');
 
-    // \cX notation  e.g. \cC
-    cmd = cmd.replace(/\\c([A-Za-z@\[\\\]^_])/g, (_m, ch: string) => {
-        const code = ch.toUpperCase().charCodeAt(0);
-        if (ch === '@') return '\x00';
-        if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-        return ch;
-    });
+    // \cX notation: \cC
+    cmd = cmd.replace(/\\c([A-Za-z@^_])/g, (_m, ch: string) => ctrlChar(ch));
 
-    // ^X caret notation  e.g. ^C  (only when ^ is at start or after whitespace to avoid false positives)
-    cmd = cmd.replace(/\^([A-Za-z@\[\\\]^_])/g, (_m, ch: string) => {
-        const code = ch.toUpperCase().charCodeAt(0);
-        if (ch === '@') return '\x00';
-        if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-        return '^' + ch;
+    // ^X caret notation: ^C
+    cmd = cmd.replace(/[\^]([A-Za-z@_])/g, (_m, ch: string) => {
+        const result = ctrlChar(ch);
+        return result.charCodeAt(0) < 32 ? result : '^' + ch;
     });
 
     // Standard escapes
@@ -139,7 +141,7 @@ export class ButtonBar extends Component<Props, State> {
 
         let newButtons: ButtonConfig[];
         if (editingButton) {
-            newButtons = buttons.map(b => b.id === editingButton.id ? { ...b, label, command } : b);
+            newButtons = buttons.map(b => (b.id === editingButton.id ? { ...b, label, command } : b));
         } else {
             newButtons = [...buttons, { id: genId(), label, command }];
         }
@@ -228,12 +230,29 @@ export class ButtonBar extends Component<Props, State> {
         this.setState({ buttons: newButtons });
     }
 
-    render(_: Props, { buttons, editMode, showEditor, editingButton, labelInput, commandInput, dragOverId, touchOverId, touchDragId }: State) {
+    render(
+        _: Props,
+        {
+            buttons,
+            editMode,
+            showEditor,
+            editingButton,
+            labelInput,
+            commandInput,
+            dragOverId,
+            touchOverId,
+            touchDragId,
+        }: State
+    ) {
         const activeDragOver = (id: string) => dragOverId === id || touchOverId === id;
         const isDragging = (id: string) => touchDragId === id;
 
         return (
-            <div class="ttyd-buttonbar" onTouchMove={e => this.onTouchMove(e as TouchEvent)} onTouchEnd={this.onTouchEnd}>
+            <div
+                class="ttyd-buttonbar"
+                onTouchMove={e => this.onTouchMove(e as TouchEvent)}
+                onTouchEnd={this.onTouchEnd}
+            >
                 <div class="ttyd-buttonbar-inner">
                     {buttons.map(btn => (
                         <div
@@ -244,49 +263,51 @@ export class ButtonBar extends Component<Props, State> {
                                 editMode ? 'edit-mode' : '',
                                 activeDragOver(btn.id) ? 'drag-over' : '',
                                 isDragging(btn.id) ? 'dragging' : '',
-                            ].filter(Boolean).join(' ')}
+                            ]
+                                .filter(Boolean)
+                                .join(' ')}
                             draggable={editMode}
-                            onDragStart={editMode ? (e => this.onDragStart(btn.id, e as DragEvent)) : undefined}
-                            onDragOver={editMode ? (e => this.onDragOver(btn.id, e as DragEvent)) : undefined}
-                            onDrop={editMode ? (e => this.onDrop(btn.id, e as DragEvent)) : undefined}
+                            onDragStart={editMode ? e => this.onDragStart(btn.id, e as DragEvent) : undefined}
+                            onDragOver={editMode ? e => this.onDragOver(btn.id, e as DragEvent) : undefined}
+                            onDrop={editMode ? e => this.onDrop(btn.id, e as DragEvent) : undefined}
                             onDragEnd={editMode ? this.onDragEnd : undefined}
-                            onTouchStart={editMode ? (e => this.onTouchStart(btn.id, e as TouchEvent)) : undefined}
+                            onTouchStart={editMode ? e => this.onTouchStart(btn.id, e as TouchEvent) : undefined}
                         >
                             <button
                                 class="ttyd-btn"
-                                onClick={editMode ? (e => this.openEdit(btn, e)) : (() => this.handleClick(btn))}
+                                onClick={editMode ? e => this.openEdit(btn, e) : () => this.handleClick(btn)}
                                 title={editMode ? 'Click to edit' : btn.command}
                             >
                                 {btn.label}
                             </button>
                             {editMode && (
-                                <button
-                                    class="ttyd-btn-del"
-                                    onClick={e => this.deleteButton(btn.id, e)}
-                                    title="Delete"
-                                >✕</button>
+                                <button class="ttyd-btn-del" onClick={e => this.deleteButton(btn.id, e)} title="Delete">
+                                    ✕
+                                </button>
                             )}
                         </div>
                     ))}
 
                     {/* ＋ Add button */}
-                    <button class="ttyd-btn-add" onClick={this.openAdd} title="Add button">＋</button>
+                    <button class="ttyd-btn-add" onClick={this.openAdd} title="Add button">
+                        ＋
+                    </button>
 
                     {/* Edit mode toggle */}
                     <button
                         class={`ttyd-btn-editmode${editMode ? ' active' : ''}`}
                         onClick={this.toggleEditMode}
                         title={editMode ? 'Exit edit mode' : 'Edit buttons'}
-                    >✎</button>
+                    >
+                        ✎
+                    </button>
                 </div>
 
                 {/* ── Editor dialog ── */}
                 {showEditor && (
                     <div class="ttyd-editor-overlay" onClick={this.closeEditor}>
                         <div class="ttyd-editor" onClick={e => e.stopPropagation()} onKeyDown={this.handleKeyDown}>
-                            <div class="ttyd-editor-title">
-                                {editingButton ? 'Edit Button' : 'Add Button'}
-                            </div>
+                            <div class="ttyd-editor-title">{editingButton ? 'Edit Button' : 'Add Button'}</div>
 
                             <label class="ttyd-editor-label">Label</label>
                             <input
@@ -311,10 +332,16 @@ export class ButtonBar extends Component<Props, State> {
                             />
 
                             <div class="ttyd-editor-actions">
-                                <button class="ttyd-editor-btn ttyd-editor-cancel" onClick={this.closeEditor}>Cancel</button>
-                                <button class="ttyd-editor-btn ttyd-editor-save" onClick={this.saveButton}>Save</button>
+                                <button class="ttyd-editor-btn ttyd-editor-cancel" onClick={this.closeEditor}>
+                                    Cancel
+                                </button>
+                                <button class="ttyd-editor-btn ttyd-editor-save" onClick={this.saveButton}>
+                                    Save
+                                </button>
                             </div>
-                            <div class="ttyd-editor-tip">Ctrl+Enter save · Esc cancel · drag to reorder (edit mode)</div>
+                            <div class="ttyd-editor-tip">
+                                Ctrl+Enter save · Esc cancel · drag to reorder (edit mode)
+                            </div>
                         </div>
                     </div>
                 )}
