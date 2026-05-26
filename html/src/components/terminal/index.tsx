@@ -4,6 +4,7 @@ import { Xterm, XtermOptions } from './xterm';
 
 import '@xterm/xterm/css/xterm.css';
 import { Modal } from '../modal';
+import { ButtonBar } from '../buttonbar';
 
 interface Props extends XtermOptions {
     id: string;
@@ -34,7 +35,9 @@ export class Terminal extends Component<Props, State> {
 
     render({ id }: Props, { modal }: State) {
         return (
-            <div id={id} ref={c => (this.container = c as HTMLElement)}>
+            <div id={id} style="display:flex;flex-direction:column;height:100%">
+                <div class="ttyd-terminal-area" ref={(c: HTMLDivElement | null) => { this.container = c as HTMLElement; }} style="flex:1;min-height:0;overflow:hidden" />
+                <ButtonBar onSendCommand={this.sendCommand} />
                 <Modal show={modal}>
                     <label class="file-label">
                         <input onChange={this.sendFile} class="file-input" type="file" multiple />
@@ -48,6 +51,11 @@ export class Terminal extends Component<Props, State> {
     @bind
     showModal() {
         this.setState({ modal: true });
+    }
+
+    @bind
+    sendCommand(command: string | Uint8Array) {
+        this.xterm.sendData(command);
     }
 
     @bind
