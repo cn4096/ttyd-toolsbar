@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/frontend.yml"
       - "html/**"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,19 +18,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # 需要完整历史才能 push 回去（用 GITHUB_TOKEN 时需要）
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Build frontend & generate src/html.h
+      - name: Install dependencies
         run: |
           corepack enable
           corepack prepare yarn@stable --activate
           yarn install
-          yarn run build
+        working-directory: html
+
+      - name: Auto-fix prettier & eslint
+        run: |
+          npx prettier --write src/components/buttonbar/index.tsx \
+                               src/components/buttonbar/buttonbar.scss \
+                               src/components/terminal/index.tsx \
+                               src/style/index.scss
+          npx eslint --fix src/components/buttonbar/index.tsx \
+                           src/components/terminal/index.tsx || true
+        working-directory: html
+
+      - name: Build frontend & generate src/html.h
+        run: yarn run build
         working-directory: html
 
       - name: Check if html.h changed
@@ -38,9 +51,8 @@ jobs:
           git diff --quiet src/html.h && echo "changed=false" >> $GITHUB_OUTPUT \
             || echo "changed=true" >> $GITHUB_OUTPUT
 
-      # 只有 push（非 PR）且 html.h 有变动时才 commit 回去
       - name: Commit & push src/html.h
-        if: github.event_name == 'push' && steps.diff.outputs.changed == 'true'
+        if: github.event_name != 'pull_request' && steps.diff.outputs.changed == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
