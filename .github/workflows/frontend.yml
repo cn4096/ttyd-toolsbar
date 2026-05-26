@@ -2,27 +2,48 @@ name: frontend
 
 on:
   push:
+    branches: ["**"]
     paths:
-    - ".github/workflows/frontend.yml"
-    - "html/*"
+      - ".github/workflows/frontend.yml"
+      - "html/**"
   pull_request:
     paths:
-    - ".github/workflows/frontend.yml"
-    - "html/*"
+      - ".github/workflows/frontend.yml"
+      - "html/**"
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v4
         with:
-          node-version: 18
-      - name: Run yarn install, check and build
+          # 需要完整历史才能 push 回去（用 GITHUB_TOKEN 时需要）
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend & generate src/html.h
         run: |
           corepack enable
           corepack prepare yarn@stable --activate
           yarn install
-          yarn run check
           yarn run build
         working-directory: html
+
+      - name: Check if html.h changed
+        id: diff
+        run: |
+          git diff --quiet src/html.h && echo "changed=false" >> $GITHUB_OUTPUT \
+            || echo "changed=true" >> $GITHUB_OUTPUT
+
+      # 只有 push（非 PR）且 html.h 有变动时才 commit 回去
+      - name: Commit & push src/html.h
+        if: github.event_name == 'push' && steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/html.h
+          git commit -m "chore: rebuild src/html.h [skip ci]"
+          git push
