@@ -1,5 +1,5 @@
 ## 功能
-  带自定义底部按钮toolbar的web ttyd.
+  带自定义底部按钮网页版 `ssh ttyd`
   
   <img width="672" height="430" alt="image" src="https://github.com/user-attachments/assets/65d37a27-01c3-49fa-830e-06c263f5bae9" />
 
@@ -7,7 +7,7 @@
 
 这是**完全静态链接**的二进制，不依赖任何系统库。
 
-Action 编译的 `ttyd.aarch64`（1.3MB）是静态版，用的是 **musl libc**，但 musl 是**编译进去的** 。
+release 的 `ttyd.aarch64`（1.3MB）是静态版，用的是 **musl libc**，但 musl 是**编译进去的** 。
 
 所以你的设备上：
 
