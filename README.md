@@ -4,6 +4,23 @@
   <img width="672" height="430" alt="image" src="https://github.com/user-attachments/assets/65d37a27-01c3-49fa-830e-06c263f5bae9" />
 
 ## 使用说明
+不需要！这是**完全静态链接**的二进制，不依赖任何系统库。
+
+Action 编译的 `ttyd.aarch64`（1.3MB）是静态版，用的是 **musl libc**，但 musl 是**编译进去的** 。
+
+所以你的设备上：
+
+- ✅ 不需要安装任何依赖库
+- ✅ 不需要 musl、glibc、openssl、libwebsockets
+- ✅ 复制到任何 aarch64 Linux 设备直接运行
+- ✅ Alpine、Ubuntu、Debian、OpenWrt 都能跑
+- ✅ 内核版本 ≥ 3.7 即可（几乎所有现代设备都满足）
+
+```bash
+# 下载后直接用，就这么简单
+chmod +x ttyd.aarch64
+./ttyd.aarch64 -W -p 7681 bash
+```
 
 直接看 ttyd 的参数：常用例子：
 
