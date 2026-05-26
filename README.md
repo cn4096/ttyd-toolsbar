@@ -1,5 +1,8 @@
 ## 功能
-  带自定义底部按钮toolbar
+  带自定义底部按钮toolbar的web ttyd.
+  
+  <img width="672" height="430" alt="image" src="https://github.com/user-attachments/assets/65d37a27-01c3-49fa-830e-06c263f5bae9" />
+
 ## 使用说明
 
 直接看 ttyd 的参数：常用例子：
