@@ -1,0 +1,331 @@
+// ─── Button bar container ──────────────────────────────────────────────────
+.ttyd-buttonbar {
+  position: relative;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+  z-index: 10;
+  // safe-area for iPhone home-bar
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.ttyd-buttonbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  min-height: 38px;
+  // make sure touch scrolling works when many buttons overflow
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+// ─── Individual button wrapper ─────────────────────────────────────────────
+.ttyd-btn-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, opacity 0.15s;
+
+  &.drag-over {
+    border-color: #4d9cf4;
+    background: rgba(77, 156, 244, 0.12);
+  }
+
+  &.dragging {
+    opacity: 0.4;
+  }
+
+  // In edit mode the whole wrap gets a dashed outline so user knows it's draggable
+  &.edit-mode {
+    cursor: grab;
+    border-color: #3a3a3a;
+
+    &:active { cursor: grabbing; }
+  }
+}
+
+// ─── Main action button ────────────────────────────────────────────────────
+.ttyd-btn {
+  background: #2d2d2d;
+  color: #d2d2d2;
+  border: 1px solid #444;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  padding: 0 12px;
+  height: 28px;
+  line-height: 28px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  // larger tap target on mobile
+  min-width: 44px;
+  touch-action: manipulation;
+
+  &:hover {
+    background: #3a3a3a;
+    color: #fff;
+    border-color: #666;
+  }
+  &:active {
+    background: #4d9cf4;
+    color: #fff;
+    border-color: #4d9cf4;
+  }
+
+  // When there's NO delete button next to it, round both sides
+  &:last-child,
+  &:only-child {
+    border-right: 1px solid #444;
+    border-radius: 4px;
+  }
+}
+
+// ─── Delete button (edit mode only) ───────────────────────────────────────
+.ttyd-btn-del {
+  background: #232323;
+  color: #666;
+  border: 1px solid #444;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  padding: 0 7px;
+  height: 28px;
+  line-height: 28px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  touch-action: manipulation;
+
+  &:hover {
+    background: #3a3a3a;
+    color: #f54235;
+    border-color: #666;
+  }
+  &:active {
+    background: #4a1a1a;
+    color: #f54235;
+  }
+}
+
+// ─── ＋ Add button ─────────────────────────────────────────────────────────
+.ttyd-btn-add {
+  background: transparent;
+  color: #555;
+  border: 1px dashed #3a3a3a;
+  border-radius: 4px;
+  padding: 0 10px;
+  height: 28px;
+  line-height: 26px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  touch-action: manipulation;
+
+  &:hover {
+    color: #4d9cf4;
+    border-color: #4d9cf4;
+  }
+  &:active {
+    color: #fff;
+    background: #4d9cf4;
+    border-color: #4d9cf4;
+  }
+}
+
+// ─── ✎ Edit-mode toggle button ─────────────────────────────────────────────
+.ttyd-btn-editmode {
+  background: transparent;
+  color: #444;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 28px;
+  line-height: 26px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  touch-action: manipulation;
+
+  &:hover {
+    color: #888;
+    border-color: #3a3a3a;
+  }
+
+  // Active / edit-mode-on state: highlighted amber
+  &.active {
+    color: #f0a500;
+    background: rgba(240, 165, 0, 0.1);
+    border-color: rgba(240, 165, 0, 0.35);
+
+    &:hover {
+      background: rgba(240, 165, 0, 0.18);
+    }
+  }
+
+  &:active {
+    background: rgba(240, 165, 0, 0.22);
+  }
+}
+
+// ─── Editor overlay (modal) ────────────────────────────────────────────────
+.ttyd-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // touch: don't scroll behind overlay
+  touch-action: none;
+}
+
+.ttyd-editor {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 20px 20px 16px;
+  // responsive width: full-width on narrow screens
+  width: min(380px, calc(100vw - 24px));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  // prevent keyboard from hiding the dialog on mobile
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.ttyd-editor-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 2px;
+  letter-spacing: 0.02em;
+}
+
+.ttyd-editor-label {
+  font-size: 11px;
+  color: #777;
+  margin-bottom: 1px;
+}
+
+.ttyd-editor-hint {
+  color: #4a4a4a;
+  font-size: 10px;
+}
+
+.ttyd-editor-input,
+.ttyd-editor-textarea {
+  background: #141414;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #d2d2d2;
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12px;
+  padding: 7px 9px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+  // nicer on mobile
+  -webkit-appearance: none;
+
+  &:focus {
+    border-color: #4d9cf4;
+  }
+  &::placeholder {
+    color: #3a3a3a;
+  }
+}
+
+.ttyd-editor-textarea {
+  min-height: 80px;
+  line-height: 1.55;
+}
+
+.ttyd-editor-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.ttyd-editor-btn {
+  border: none;
+  border-radius: 6px;
+  // larger touch targets
+  padding: 8px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+  touch-action: manipulation;
+}
+
+.ttyd-editor-cancel {
+  background: #2a2a2a;
+  color: #999;
+  &:hover { background: #333; color: #ccc; }
+}
+
+.ttyd-editor-save {
+  background: #4d9cf4;
+  color: #fff;
+  &:hover { background: #6aaff5; }
+  &:active { background: #2d82d0; }
+}
+
+.ttyd-editor-tip {
+  font-size: 10px;
+  color: #3a3a3a;
+  text-align: center;
+  margin-top: 2px;
+}
+
+// ─── Mobile adjustments ────────────────────────────────────────────────────
+@media (max-width: 600px) {
+  .ttyd-buttonbar-inner {
+    padding: 4px 6px;
+    gap: 5px;
+  }
+
+  .ttyd-btn {
+    padding: 0 10px;
+    height: 32px;
+    line-height: 32px;
+    font-size: 13px;
+  }
+
+  .ttyd-btn-del {
+    height: 32px;
+    line-height: 32px;
+    padding: 0 9px;
+    font-size: 13px;
+  }
+
+  .ttyd-btn-add,
+  .ttyd-btn-editmode {
+    height: 32px;
+    line-height: 30px;
+    font-size: 16px;
+  }
+
+  .ttyd-editor {
+    border-radius: 14px;
+    padding: 18px 16px 14px;
+  }
+
+  .ttyd-editor-btn {
+    padding: 10px 22px;
+    font-size: 14px;
+  }
+}
