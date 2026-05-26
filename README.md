@@ -4,6 +4,15 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/tsl0922/ttyd)](https://hub.docker.com/r/tsl0922/ttyd)
 [![Packaging status](https://repology.org/badge/tiny-repos/ttyd.svg)](https://repology.org/project/ttyd/versions)
 ![GitHub](https://img.shields.io/github/license/tsl0922/ttyd)
+## 说明
+  带自定义底部按钮toolbar
+## action 流程
+
+<img width="661" height="665" alt="image" src="https://github.com/user-attachments/assets/fca5e33f-1144-40b2-a161-184b7ddd63c3" />
+
+改文件后  html/ 文件，它就会自动生成并保存 html.h，你只需要最后打个 tag 就能发布完整的编译版本。
+
+`Releases → Draft a new release → Choose a tag → 输入版本号 → Publish`
 
 # ttyd - Share your terminal over the web
 
