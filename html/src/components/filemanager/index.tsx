@@ -75,8 +75,13 @@ export class FileManager extends Component<Props, State> {
 
     // ── API helpers ──────────────────────────────────────────
 
-    private async loadDir(path: string) {
-        this.setState({ loading: true, error: '', selected: null });
+    private async loadDir(rawPath: string) {
+        // normalise: always start with /, never end with / (except root)
+        let path = rawPath.replace(/\/+/g, '/');
+        if (!path.startsWith('/')) path = '/' + path;
+        if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+
+        this.setState({ loading: true, error: '', selected: null, path });
         try {
             const r = await fetch(`/files?path=${encodeURIComponent(path)}`);
             if (!r.ok) {
@@ -89,7 +94,8 @@ export class FileManager extends Component<Props, State> {
                 if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
                 return a.name.localeCompare(b.name);
             });
-            this.setState({ files, path: data.path, loading: false });
+            // use normalised path from frontend, not from server
+            this.setState({ files, loading: false });
         } catch (e) {
             this.setState({ error: String(e), loading: false });
         }
