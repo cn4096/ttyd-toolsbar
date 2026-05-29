@@ -1,5 +1,5 @@
 ## ttyd plus 新增功能
- + 带自定义底部按钮网页版 `ssh ttyd`
+ + 可自定义底部快捷按钮
   
   <img width="672" height="430" alt="image" src="https://github.com/user-attachments/assets/65d37a27-01c3-49fa-830e-06c263f5bae9" />
   
