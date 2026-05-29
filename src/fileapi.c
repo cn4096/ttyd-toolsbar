@@ -360,3 +360,29 @@ int file_api_upload_end(struct lws *wsi, upload_state_t *up) {
 }
 
 /* get_query_param exposed via file_api_get_query_param in header */
+
+/* ── POST /file/mkdir ─────────────────────────────────────── */
+
+int file_api_mkdir(struct lws *wsi, const char *root,
+                   const char *body, size_t body_len) {
+    struct json_object *req = json_tokener_parse(body);
+    if (!req) return send_error(wsi, HTTP_STATUS_BAD_REQUEST, "bad json");
+
+    struct json_object *jpath;
+    if (!json_object_object_get_ex(req, "path", &jpath)) {
+        json_object_put(req);
+        return send_error(wsi, HTTP_STATUS_BAD_REQUEST, "missing path");
+    }
+    const char *rel = json_object_get_string(jpath);
+
+    char abs[FILE_API_PATH_MAX];
+    if (!file_api_safe_path(root, rel, abs, sizeof(abs))) {
+        json_object_put(req);
+        return send_error(wsi, HTTP_STATUS_FORBIDDEN, "forbidden");
+    }
+    json_object_put(req);
+
+    if (mkdir(abs, 0755) != 0)
+        return send_error(wsi, 500, strerror(errno));
+    return send_ok(wsi, "created");
+}

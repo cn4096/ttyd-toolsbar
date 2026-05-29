@@ -217,7 +217,8 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 
         /* POST /file/delete  or  POST /file/rename — body buffered */
         if (path_is(pss->path, "/file/delete") ||
-            path_is(pss->path, "/file/rename")) {
+            path_is(pss->path, "/file/rename") ||
+            path_is(pss->path, "/file/mkdir")) {
           /* body arrives in LWS_CALLBACK_HTTP_BODY; allocate a buffer */
           pss->buffer = xmalloc(4096);
           pss->ptr    = pss->buffer;
@@ -338,6 +339,14 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
       if (path_is(pss->path, "/file/rename")) {
         int rc = file_api_rename(wsi, server->file_root,
                                   pss->buffer, pss->len);
+        free(pss->buffer);
+        pss->buffer = NULL;
+        return rc;
+      }
+
+      if (path_is(pss->path, "/file/mkdir")) {
+        int rc = file_api_mkdir(wsi, server->file_root,
+                                 pss->buffer, pss->len);
         free(pss->buffer);
         pss->buffer = NULL;
         return rc;

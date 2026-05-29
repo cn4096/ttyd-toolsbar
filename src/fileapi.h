@@ -26,6 +26,9 @@ int file_api_delete(struct lws *wsi, const char *root, const char *body, size_t 
 /* POST /file/rename   body: {"from":"...","to":"..."} */
 int file_api_rename(struct lws *wsi, const char *root, const char *body, size_t body_len);
 
+/* POST /file/mkdir  body: {"path":"..."} */
+int file_api_mkdir(struct lws *wsi, const char *root, const char *body, size_t body_len);
+
 /* pss for upload state (embed in pss_http) */
 typedef struct {
     char        dest_path[FILE_API_PATH_MAX];

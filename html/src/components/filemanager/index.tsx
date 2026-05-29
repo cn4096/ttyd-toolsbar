@@ -22,11 +22,12 @@ interface State {
     uploading: boolean;
     uploadLabel: string;
     uploadPct: number;
-    modal: 'rename' | 'delete' | 'conflict' | 'edit' | null;
+    modal: 'rename' | 'delete' | 'conflict' | 'edit' | 'newfile' | 'newdir' | null;
     modalFile: FileEntry | null;
     renameValue: string;
     editContent: string;
     editSaving: boolean;
+    newName: string;
     pendingFiles: File[];
     pendingIdx: number;
 }
@@ -238,6 +239,7 @@ export class FileManager extends Component<Props, State> {
             renameValue: '',
             editContent: '',
             editSaving: false,
+            newName: '',
             pendingFiles: [],
             pendingIdx: 0,
         };
@@ -397,6 +399,39 @@ export class FileManager extends Component<Props, State> {
             }
         } catch (err) {
             this.setState({ modal: null, error: `Failed to load: ${err}` });
+        }
+    };
+
+    // ── New file / New folder ────────────────────────────────
+
+    private openNew = (type: 'newfile' | 'newdir') => {
+        this.setState({ modal: type, newName: '' });
+    };
+
+    private confirmNew = async () => {
+        const { modal, newName, path } = this.state;
+        const name = newName.trim();
+        if (!name) return;
+        this.setState({ modal: null });
+
+        if (modal === 'newdir') {
+            // create empty dir via rename trick: upload a placeholder then delete, or use mkdir API
+            // simplest: POST /file/mkdir
+            const res = await this.apiPost('/file/mkdir', { path: joinPath(path, name) });
+            if (res.error) this.setState({ error: res.error });
+            else this.loadDir(path);
+        } else {
+            // create empty file via upload with empty body
+            const fp = joinPath(path, name);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/file/upload?path=${encodeURIComponent(fp)}`);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.onloadend = () => {
+                const ok = xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300);
+                if (ok) this.loadDir(path);
+                else this.setState({ error: `Create failed: ${name}` });
+            };
+            xhr.send(new Blob([]));
         }
     };
 
@@ -612,6 +647,8 @@ export class FileManager extends Component<Props, State> {
                         </button>
                     </label>
                     <button onClick={() => this.loadDir(path)}>↻ Refresh</button>
+                    <button onClick={() => this.openNew('newfile')}>+ File</button>
+                    <button onClick={() => this.openNew('newdir')}>+ Folder</button>
                     {!isRoot && <button onClick={this.navUp}>↑ Up</button>}
                     <span class="fm-spacer" />
                     {error && <span style="color:#f54235;font-size:11px">{error}</span>}
@@ -768,6 +805,34 @@ export class FileManager extends Component<Props, State> {
                                 </button>
                             </div>
                             <div class="fm-editor-tip">Ctrl+S to save · Esc to cancel</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal: New file / New folder */}
+                {(modal === 'newfile' || modal === 'newdir') && (
+                    <div class="fm-modal-overlay" onClick={() => this.setState({ modal: null })}>
+                        <div class="fm-modal" onClick={e => e.stopPropagation()}>
+                            <div class="fm-modal-title">{modal === 'newfile' ? '+ New file' : '+ New folder'}</div>
+                            <input
+                                type="text"
+                                placeholder={modal === 'newfile' ? 'filename.txt' : 'folder-name'}
+                                value={state.newName}
+                                autofocus
+                                onInput={e => this.setState({ newName: (e.target as HTMLInputElement).value })}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') this.confirmNew();
+                                    if (e.key === 'Escape') this.setState({ modal: null });
+                                }}
+                            />
+                            <div class="fm-modal-actions">
+                                <button class="btn-cancel" onClick={() => this.setState({ modal: null })}>
+                                    Cancel
+                                </button>
+                                <button class="btn-ok" onClick={this.confirmNew}>
+                                    Create
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
