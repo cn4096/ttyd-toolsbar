@@ -34,8 +34,8 @@ static void url_decode(char *dst, size_t dsz, const char *src) {
 }
 
 /* extract query param value from URL query string */
-static bool get_query_param(const char *query, const char *key,
-                             char *out, size_t outsz) {
+bool file_api_get_query_param(const char *query, const char *key,
+                               char *out, size_t outsz) {
     size_t klen = strlen(key);
     const char *p = query;
     while (p && *p) {
@@ -113,7 +113,7 @@ static int send_json(struct lws *wsi, int http_status,
     memcpy(buf + LWS_PRE, body, body_len);
     lws_write(wsi, buf + LWS_PRE, body_len, LWS_WRITE_HTTP);
     free(buf);
-    lws_http_transaction_completed(wsi);
+(void)lws_http_transaction_completed(wsi);
     return 0;
 }
 
@@ -231,7 +231,7 @@ int file_api_download(struct lws *wsi, const char *root,
         }
     }
     fclose(fp);
-    lws_http_transaction_completed(wsi);
+(void)lws_http_transaction_completed(wsi);
     return 0;
 }
 
@@ -437,9 +437,4 @@ int file_api_upload_end(struct lws *wsi, upload_state_t *up) {
     return send_ok(wsi, msg);
 }
 
-/* ── URL query extraction helpers (used in http.c) ───────── */
-
-bool file_api_get_query_param(const char *query, const char *key,
-                               char *out, size_t outsz) {
-    return get_query_param(query, key, out, outsz);
-}
+/* get_query_param exposed via file_api_get_query_param in header */

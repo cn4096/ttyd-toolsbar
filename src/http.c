@@ -282,13 +282,13 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
           unsigned char hdr2[LWS_PRE + 256], *p2 = hdr2 + LWS_PRE,
                         *e2 = hdr2 + sizeof(hdr2) - 1;
           const char *emsg = "{\"error\":\"file too large (max 30MB)\"}";
-          lws_add_http_header_status(wsi, 413, &p2, e2);
-          lws_add_http_header_content_length(
-              wsi, strlen(emsg), &p2, e2);
-          lws_finalize_http_header(wsi, &p2, e2);
-          lws_write(wsi, hdr2 + LWS_PRE,
-                    (size_t)(p2 - (hdr2 + LWS_PRE)),
-                    LWS_WRITE_HTTP_HEADERS);
+          if (!lws_add_http_header_status(wsi, 413, &p2, e2) &&
+              !lws_add_http_header_content_length(wsi, strlen(emsg), &p2, e2) &&
+              !lws_finalize_http_header(wsi, &p2, e2)) {
+            lws_write(wsi, hdr2 + LWS_PRE,
+                      (size_t)(p2 - (hdr2 + LWS_PRE)),
+                      LWS_WRITE_HTTP_HEADERS);
+          }
           lws_http_transaction_completed(wsi);
           return 1;
         }
