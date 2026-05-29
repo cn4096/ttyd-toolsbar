@@ -43,6 +43,8 @@ function fmtDate(ts: number): string {
 }
 
 export class FileManager extends Component<Props, State> {
+    private navSeq = 0; // increment on each navigation to discard stale responses
+
     constructor(props: Props) {
         super(props);
         this.state = {
@@ -76,30 +78,33 @@ export class FileManager extends Component<Props, State> {
     // ── API helpers ──────────────────────────────────────────
 
     private async loadDir(rawPath: string) {
-        // prevent concurrent navigation races
-        if (this.state.loading) return;
         // normalise: always start with /, never end with / (except root)
         let path = rawPath.replace(/\/+/g, '/');
         if (!path.startsWith('/')) path = '/' + path;
         if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
 
+        // increment sequence — stale responses from older navigations will be ignored
+        const seq = ++this.navSeq;
         this.setState({ loading: true, error: '', selected: null, path });
         try {
             const r = await fetch(`/files?path=${encodeURIComponent(path)}`);
+            if (seq !== this.navSeq) return; // superseded by a newer navigation
             if (!r.ok) {
                 const j = await r.json();
                 this.setState({ error: j.error || 'Load failed', loading: false });
                 return;
             }
             const data = await r.json();
+            if (seq !== this.navSeq) return; // superseded
             const files: FileEntry[] = (data.files as FileEntry[]).sort((a, b) => {
                 if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
                 return a.name.localeCompare(b.name);
             });
-            // use normalised path from frontend, not from server
             this.setState({ files, loading: false });
         } catch (e) {
-            this.setState({ error: String(e), loading: false });
+            if (seq === this.navSeq) {
+                this.setState({ error: String(e), loading: false });
+            }
         }
     }
 
