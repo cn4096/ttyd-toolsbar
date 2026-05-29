@@ -309,23 +309,10 @@ int file_api_rename(struct lws *wsi, const char *root,
  * file bytes to disk until the closing boundary.
  */
 
-static void extract_boundary(const char *ct, char *boundary, int *blen) {
-    const char *p = strstr(ct, "boundary=");
-    if (!p) { *blen = 0; return; }
-    p += 9;
-    /* skip optional quote */
-    if (*p == '"') p++;
-    int i = 0;
-    while (*p && *p != '"' && *p != ';' && *p != ' ' && *p != '\r' &&
-           *p != '\n' && i < 127)
-        boundary[i++] = *p++;
-    boundary[i] = '\0';
-    *blen = i;
-}
-
 int file_api_upload_begin(struct lws *wsi, const char *root,
                            const char *rel_path, const char *content_type,
                            upload_state_t *up) {
+    (void)content_type;
     memset(up, 0, sizeof(*up));
 
     char abs[FILE_API_PATH_MAX];
@@ -333,96 +320,31 @@ int file_api_upload_begin(struct lws *wsi, const char *root,
         return send_error(wsi, HTTP_STATUS_FORBIDDEN, "forbidden");
 
     snprintf(up->dest_path, sizeof(up->dest_path), "%s", abs);
-    extract_boundary(content_type, up->boundary, &up->boundary_len);
-    if (up->boundary_len == 0)
-        return send_error(wsi, HTTP_STATUS_BAD_REQUEST, "no boundary");
 
-    /* open destination file */
     up->fp = fopen(abs, "wb");
     if (!up->fp)
         return send_error(wsi, 500, strerror(errno));
 
-    return 0;   /* 0 = continue, caller should not send response yet */
+    return 0;
 }
 
-/*
- * Feed a chunk of body bytes into the upload state machine.
- * Returns 0 on success, -1 on error.
- */
 int file_api_upload_body(upload_state_t *up, const char *data, size_t len) {
     if (!up->fp) return -1;
 
-    /* Accumulate leftover + new data in a temp buffer */
-    size_t total = (size_t)up->leftover_len + len;
-    char *buf = xmalloc(total + 1);
-    memcpy(buf, up->leftover, (size_t)up->leftover_len);
-    memcpy(buf + up->leftover_len, data, len);
-    buf[total] = '\0';
-
-    char *p = buf;
-    size_t remaining = total;
-
-    if (!up->header_done) {
-        /* Look for blank line separating MIME headers from file data */
-        char *hdr_end = strstr(p, "\r\n\r\n");
-        if (!hdr_end) {
-            /* keep in leftover */
-            size_t keep = remaining < (size_t)(sizeof(up->leftover) - 1)
-                              ? remaining
-                              : (size_t)(sizeof(up->leftover) - 1);
-            memcpy(up->leftover, p + remaining - keep, keep);
-            up->leftover_len = (int)keep;
-            free(buf);
-            return 0;
-        }
-        hdr_end += 4;  /* skip \r\n\r\n */
-        p = hdr_end;
-        remaining = (size_t)(buf + total - p);
-        up->header_done = true;
-        up->in_file_data = true;
+    if (up->received + len > FILE_API_MAX_UPLOAD) {
+        fclose(up->fp);
+        up->fp = NULL;
+        unlink(up->dest_path);
+        return -1;  /* size exceeded */
     }
 
-    if (up->in_file_data && remaining > 0) {
-        /* Strip the closing boundary at the end: --boundary--\r\n */
-        /* We write everything except a tail that could be the boundary */
-        char close_bound[256];
-        int cb_len = snprintf(close_bound, sizeof(close_bound),
-                              "\r\n--%s--", up->boundary);
-
-        /* Safe write: keep last cb_len bytes in leftover */
-        int safe = (int)remaining - cb_len;
-        if (safe > 0) {
-            if (up->received + (size_t)safe > FILE_API_MAX_UPLOAD) {
-                fclose(up->fp);
-                up->fp = NULL;
-                unlink(up->dest_path);
-                free(buf);
-                return -1;  /* size exceeded */
-            }
-            fwrite(p, 1, (size_t)safe, up->fp);
-            up->received += (size_t)safe;
-            p += safe;
-            remaining = (size_t)cb_len;
-        }
-        /* keep tail in leftover */
-        size_t keep = remaining < (size_t)(sizeof(up->leftover) - 1)
-                          ? remaining
-                          : (size_t)(sizeof(up->leftover) - 1);
-        memcpy(up->leftover, p + remaining - keep, keep);
-        up->leftover_len = (int)keep;
-    }
-
-    free(buf);
+    fwrite(data, 1, len, up->fp);
+    up->received += len;
     return 0;
 }
 
 int file_api_upload_end(struct lws *wsi, upload_state_t *up) {
     if (up->fp) {
-        /*
-         * leftover may contain: \r\n--boundary--\r\n
-         * We should NOT write that to the file.
-         * Just close.
-         */
         fclose(up->fp);
         up->fp = NULL;
     }

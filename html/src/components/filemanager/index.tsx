@@ -322,9 +322,9 @@ export class FileManager extends Component<Props, State> {
             });
         };
 
-        const form = new FormData();
-        form.append('file', file, destName);
-        xhr.send(form);
+        /* send as raw octet-stream — backend writes bytes directly to file */
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.send(file);
     }
 
     // ── Render ───────────────────────────────────────────────

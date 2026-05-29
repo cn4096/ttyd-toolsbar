@@ -95,13 +95,17 @@ static void access_log(struct lws *wsi, const char *path) {
 
 /* ── file API route matching ─────────────────────────────── */
 
-static bool path_is(const char *path, const char *prefix, const char **rest) {
+static bool path_is(const char *path, const char *prefix) {
   size_t plen = strlen(prefix);
   if (strncmp(path, prefix, plen) != 0) return false;
-  if (path[plen] != '\0' && path[plen] != '?' && path[plen] != '/') return false;
-  const char *q = strchr(path + plen, '?');
-  *rest = q ? q + 1 : "";
-  return true;
+  /* lws passes path without query string, so exact match or trailing / */
+  return path[plen] == '\0' || path[plen] == '/';
+}
+
+/* read query string via lws header (lws strips it from the path) */
+static void get_query(struct lws *wsi, char *out, size_t outsz) {
+  out[0] = '\0';
+  lws_hdr_copy(wsi, out, (int)outsz, WSI_TOKEN_HTTP_URI_ARGS);
 }
 
 /* ── pss_http extension ──────────────────────────────────── */
@@ -172,23 +176,24 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 
       /* ── file API: only when --file-root is set ── */
       if (server->file_root != NULL) {
-        const char *query = "";
+        char query[FILE_API_PATH_MAX] = "";
+        get_query(wsi, query, sizeof(query));
         char rel[FILE_API_PATH_MAX] = "";
 
         /* GET /files?path=... */
-        if (path_is(pss->path, "/files", &query)) {
+        if (path_is(pss->path, "/files")) {
           file_api_get_query_param(query, "path", rel, sizeof(rel));
           return file_api_list(wsi, server->file_root, rel);
         }
 
         /* GET /file/download?path=... */
-        if (path_is(pss->path, "/file/download", &query)) {
+        if (path_is(pss->path, "/file/download")) {
           file_api_get_query_param(query, "path", rel, sizeof(rel));
           return file_api_download(wsi, server->file_root, rel);
         }
 
         /* POST /file/upload?path=...  — begin: store upload state */
-        if (path_is(pss->path, "/file/upload", &query)) {
+        if (path_is(pss->path, "/file/upload")) {
           char ct[256] = "";
           lws_hdr_copy(wsi, ct, sizeof(ct), WSI_TOKEN_HTTP_CONTENT_TYPE);
           file_api_get_query_param(query, "path", rel, sizeof(rel));
@@ -211,8 +216,8 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
         }
 
         /* POST /file/delete  or  POST /file/rename — body buffered */
-        if (path_is(pss->path, "/file/delete", &query) ||
-            path_is(pss->path, "/file/rename", &query)) {
+        if (path_is(pss->path, "/file/delete") ||
+            path_is(pss->path, "/file/rename")) {
           /* body arrives in LWS_CALLBACK_HTTP_BODY; allocate a buffer */
           pss->buffer = xmalloc(4096);
           pss->ptr    = pss->buffer;
@@ -272,7 +277,7 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
       if (!pss->buffer) break;
 
       /* upload path: pss->buffer is upload_state_t* */
-      if (path_is(pss->path, "/file/upload", &(const char *){""}) &&
+      if (path_is(pss->path, "/file/upload") &&
           server->file_root != NULL) {
         upload_state_t *up = (upload_state_t *)pss->buffer;
         if (file_api_upload_body(up, (const char *)in, len) != 0) {
@@ -309,10 +314,9 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
     case LWS_CALLBACK_HTTP_BODY_COMPLETION: {
       if (!pss->buffer || server->file_root == NULL) break;
 
-      const char *dummy = "";
 
       /* upload */
-      if (path_is(pss->path, "/file/upload", &dummy)) {
+      if (path_is(pss->path, "/file/upload")) {
         upload_state_t *up = (upload_state_t *)pss->buffer;
         int rc = file_api_upload_end(wsi, up);
         free(up);
@@ -323,7 +327,7 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
       /* null-terminate accumulated body */
       *pss->ptr = '\0';
 
-      if (path_is(pss->path, "/file/delete", &dummy)) {
+      if (path_is(pss->path, "/file/delete")) {
         int rc = file_api_delete(wsi, server->file_root,
                                   pss->buffer, pss->len);
         free(pss->buffer);
@@ -331,7 +335,7 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
         return rc;
       }
 
-      if (path_is(pss->path, "/file/rename", &dummy)) {
+      if (path_is(pss->path, "/file/rename")) {
         int rc = file_api_rename(wsi, server->file_root,
                                   pss->buffer, pss->len);
         free(pss->buffer);

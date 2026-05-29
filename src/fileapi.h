@@ -31,12 +31,6 @@ typedef struct {
     char        dest_path[FILE_API_PATH_MAX];
     FILE       *fp;
     size_t      received;
-    bool        header_done;
-    char        boundary[128];
-    int         boundary_len;
-    bool        in_file_data;
-    char        leftover[512];
-    int         leftover_len;
 } upload_state_t;
 
 int file_api_upload_begin(struct lws *wsi, const char *root,
