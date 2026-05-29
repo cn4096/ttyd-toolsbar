@@ -246,7 +246,9 @@ export class FileManager extends Component<Props, State> {
         // Generate a unique name for the old file: name_20060102_150405.ext
         const now = new Date();
         const pad = (n: number) => String(n).padStart(2, '0');
-        const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        const ymd = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+        const hms = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        const ts = `${ymd}_${hms}`;
         const dot = file.name.lastIndexOf('.');
         const baseName = dot > 0 ? file.name.slice(0, dot) : file.name;
         const ext = dot > 0 ? file.name.slice(dot) : '';
