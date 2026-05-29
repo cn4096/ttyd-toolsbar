@@ -268,3 +268,43 @@
 
   .fm-acts { display: flex !important; }
 }
+
+// ─── Text editor modal ───────────────────────────────────────────────────────
+.fm-modal-editor {
+  width: min(860px, calc(100vw - 24px));
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fm-editor-textarea {
+  flex: 1;
+  min-height: 55vh;
+  background: #0d0d0d;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #d2d2d2;
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+  box-sizing: border-box;
+  width: 100%;
+  -webkit-appearance: none;
+
+  &:focus {
+    border-color: #3a3a3a;
+  }
+}
+
+.fm-editor-tip {
+  font-size: 10px;
+  color: #333;
+  text-align: center;
+}

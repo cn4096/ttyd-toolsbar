@@ -22,9 +22,11 @@ interface State {
     uploading: boolean;
     uploadLabel: string;
     uploadPct: number;
-    modal: 'rename' | 'delete' | 'conflict' | null;
+    modal: 'rename' | 'delete' | 'conflict' | 'edit' | null;
     modalFile: FileEntry | null;
     renameValue: string;
+    editContent: string;
+    editSaving: boolean;
     pendingFiles: File[];
     pendingIdx: number;
 }
@@ -63,6 +65,159 @@ function fmtDate(ts: number): string {
     return new Date(ts * 1000).toLocaleString();
 }
 
+// Tier 1: known text extensions — open directly, no sniff needed
+const TEXT_EXTS = new Set([
+    'txt',
+    'md',
+    'rst',
+    'log',
+    'sh',
+    'bash',
+    'zsh',
+    'fish',
+    'ksh',
+    'py',
+    'js',
+    'ts',
+    'tsx',
+    'jsx',
+    'mjs',
+    'cjs',
+    'json',
+    'jsonc',
+    'yaml',
+    'yml',
+    'toml',
+    'ini',
+    'cfg',
+    'conf',
+    'env',
+    'html',
+    'htm',
+    'css',
+    'scss',
+    'sass',
+    'less',
+    'svg',
+    'xml',
+    'go',
+    'c',
+    'h',
+    'cpp',
+    'cc',
+    'cxx',
+    'hpp',
+    'cs',
+    'rs',
+    'java',
+    'kt',
+    'swift',
+    'rb',
+    'php',
+    'lua',
+    'sql',
+    'graphql',
+    'proto',
+    'csv',
+    'tsv',
+    'vue',
+    'svelte',
+    'dockerfile',
+    'makefile',
+    'gitignore',
+    'gitattributes',
+    'editorconfig',
+    'npmrc',
+    'nvmrc',
+]);
+
+// Tier 2: known binary extensions — reject immediately
+const BINARY_EXTS = new Set([
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'bmp',
+    'webp',
+    'ico',
+    'tiff',
+    'avif',
+    'mp3',
+    'mp4',
+    'wav',
+    'ogg',
+    'flac',
+    'aac',
+    'm4a',
+    'avi',
+    'mkv',
+    'mov',
+    'wmv',
+    'flv',
+    'webm',
+    'zip',
+    'gz',
+    'bz2',
+    'xz',
+    'tar',
+    'rar',
+    '7z',
+    'zst',
+    'exe',
+    'dll',
+    'so',
+    'dylib',
+    'bin',
+    'elf',
+    'apk',
+    'dmg',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'woff',
+    'woff2',
+    'ttf',
+    'otf',
+    'eot',
+    'class',
+    'pyc',
+    'pyo',
+    'o',
+    'a',
+    'lib',
+    'db',
+    'sqlite',
+    'sqlite3',
+]);
+
+type TextCheckResult = 'text' | 'binary' | 'sniff';
+
+function checkExtension(name: string): TextCheckResult {
+    const dot = name.lastIndexOf('.');
+    if (dot < 0) return 'sniff'; // no extension → sniff
+    const ext = name.slice(dot + 1).toLowerCase();
+    if (TEXT_EXTS.has(ext)) return 'text';
+    if (BINARY_EXTS.has(ext)) return 'binary';
+    return 'sniff'; // unknown extension → sniff
+}
+
+// Tier 3: sniff first 512 bytes
+function sniffIsBinary(buf: Uint8Array): boolean {
+    const len = Math.min(buf.length, 512);
+    if (len === 0) return false;
+    let nonPrint = 0;
+    for (let i = 0; i < len; i++) {
+        const b = buf[i];
+        if (b === 0) return true; // null byte → binary
+        if (b < 9 || (b > 13 && b < 32) || b === 127) nonPrint++;
+    }
+    return nonPrint / len > 0.3;
+}
+
 export class FileManager extends Component<Props, State> {
     private navSeq = 0;
 
@@ -81,6 +236,8 @@ export class FileManager extends Component<Props, State> {
             modal: null,
             modalFile: null,
             renameValue: '',
+            editContent: '',
+            editSaving: false,
             pendingFiles: [],
             pendingIdx: 0,
         };
@@ -205,6 +362,65 @@ export class FileManager extends Component<Props, State> {
         else this.loadDir(path);
     };
 
+    // ── Edit text file ───────────────────────────────────
+
+    private openEdit = async (f: FileEntry, e: MouseEvent) => {
+        e.stopPropagation();
+        const tier = checkExtension(f.name);
+
+        // Tier 2: known binary — reject immediately, no request needed
+        if (tier === 'binary') {
+            this.setState({ error: `${f.name}: binary file, cannot edit` });
+            return;
+        }
+
+        const fp = joinPath(this.state.path, f.name);
+        this.setState({ modal: 'edit', modalFile: f, editContent: '', editSaving: false });
+        try {
+            const r = await fetch(`/file/download?path=${encodeURIComponent(fp)}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+            if (tier === 'text') {
+                // Tier 1: known text — decode directly, skip sniff
+                const text = await r.text();
+                this.setState({ editContent: text });
+            } else {
+                // Tier 3: unknown extension or no extension — sniff bytes
+                const buf = await r.arrayBuffer();
+                const bytes = new Uint8Array(buf);
+                if (sniffIsBinary(bytes)) {
+                    this.setState({ modal: null, error: `${f.name}: binary file, cannot edit` });
+                    return;
+                }
+                const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+                this.setState({ editContent: text });
+            }
+        } catch (err) {
+            this.setState({ modal: null, error: `Failed to load: ${err}` });
+        }
+    };
+
+    private saveEdit = async () => {
+        const { modalFile, editContent, path } = this.state;
+        if (!modalFile) return;
+        this.setState({ editSaving: true });
+        const fp = joinPath(path, modalFile.name);
+        const blob = new Blob([editContent], { type: 'application/octet-stream' });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/file/upload?path=${encodeURIComponent(fp)}`);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.onloadend = () => {
+            const ok = xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300);
+            if (ok) {
+                this.setState({ modal: null, editSaving: false });
+                this.loadDir(path);
+            } else {
+                this.setState({ editSaving: false, error: 'Save failed' });
+            }
+        };
+        xhr.send(blob);
+    };
+
     // ── Upload ───────────────────────────────────────────────
 
     private handleDragOver = (e: DragEvent) => {
@@ -314,15 +530,23 @@ export class FileManager extends Component<Props, State> {
             }
         };
 
-        xhr.onload = () => {
-            const nextIdx = pendingIdx + 1;
-            this.setState({ uploading: nextIdx < pendingFiles.length, pendingIdx: nextIdx }, () =>
-                this.processNextUpload()
-            );
-        };
-
-        xhr.onerror = () => {
-            this.setState({ error: `Upload failed: ${file.name}`, uploading: false, pendingFiles: [], pendingIdx: 0 });
+        // onloadend fires for both success and network error
+        // treat HTTP 2xx OR empty response (file written but connection closed) as success
+        xhr.onloadend = () => {
+            const ok = xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300);
+            if (ok) {
+                const nextIdx = pendingIdx + 1;
+                this.setState({ uploading: nextIdx < pendingFiles.length, pendingIdx: nextIdx }, () =>
+                    this.processNextUpload()
+                );
+            } else {
+                this.setState({
+                    error: `Upload failed: ${file.name} (${xhr.status})`,
+                    uploading: false,
+                    pendingFiles: [],
+                    pendingIdx: 0,
+                });
+            }
         };
 
         xhr.send(file);
@@ -446,6 +670,11 @@ export class FileManager extends Component<Props, State> {
                                                 ↓
                                             </button>
                                         )}
+                                        {!f.isDir && (
+                                            <button class="fm-act" onClick={e => this.openEdit(f, e as MouseEvent)}>
+                                                ✏
+                                            </button>
+                                        )}
                                         <button class="fm-act" onClick={e => this.openRename(f, e as MouseEvent)}>
                                             ✎
                                         </button>
@@ -503,6 +732,42 @@ export class FileManager extends Component<Props, State> {
                                     Delete
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal: Edit text file */}
+                {modal === 'edit' && modalFile && (
+                    <div class="fm-modal-overlay">
+                        <div class="fm-modal fm-modal-editor">
+                            <div class="fm-modal-title">
+                                ✏ {modalFile.name}
+                                <span style="font-weight:400;font-size:11px;color:#555;margin-left:8px">
+                                    {state.editSaving ? 'Saving…' : ''}
+                                </span>
+                            </div>
+                            <textarea
+                                class="fm-editor-textarea"
+                                value={state.editContent}
+                                spellcheck={false}
+                                onInput={e => this.setState({ editContent: (e.target as HTMLTextAreaElement).value })}
+                                onKeyDown={e => {
+                                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                                        e.preventDefault();
+                                        this.saveEdit();
+                                    }
+                                    if (e.key === 'Escape') this.setState({ modal: null });
+                                }}
+                            />
+                            <div class="fm-modal-actions">
+                                <button class="btn-cancel" onClick={() => this.setState({ modal: null })}>
+                                    Cancel
+                                </button>
+                                <button class="btn-ok" onClick={this.saveEdit} disabled={state.editSaving}>
+                                    Save
+                                </button>
+                            </div>
+                            <div class="fm-editor-tip">Ctrl+S to save · Esc to cancel</div>
                         </div>
                     </div>
                 )}
