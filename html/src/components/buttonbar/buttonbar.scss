@@ -116,7 +116,7 @@
 
 // ─── ＋ Add button ─────────────────────────────────────────────────────────
 .ttyd-btn-add {
-  background: transparent;
+  background: #1a1a1a;
   color: #555;
   border: 1px dashed #3a3a3a;
   border-radius: 4px;
@@ -141,7 +141,7 @@
 
 // ─── ✎ Edit-mode toggle button ─────────────────────────────────────────────
 .ttyd-btn-editmode {
-  background: transparent;
+  background: #1a1a1a;
   color: #444;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -327,5 +327,40 @@
   .ttyd-editor-btn {
     padding: 10px 22px;
     font-size: 14px;
+  }
+}
+
+// ─── Tab buttons (Terminal / Files) ───────────────────────────────────────
+.ttyd-btn-tab {
+  background: #1a1a1a;   // explicit — overrides browser button default
+  color: #555;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 28px;
+  line-height: 26px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  touch-action: manipulation;
+
+  &:hover {
+    color: #888;
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+  }
+
+  &.active {
+    color: #4d9cf4;
+    background: rgba(77, 156, 244, 0.1);
+    border-color: rgba(77, 156, 244, 0.35);
+  }
+}
+
+@media (max-width: 600px) {
+  .ttyd-btn-tab {
+    height: 32px;
+    line-height: 30px;
+    font-size: 16px;
   }
 }

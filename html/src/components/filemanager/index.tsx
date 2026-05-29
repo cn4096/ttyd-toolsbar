@@ -76,6 +76,8 @@ export class FileManager extends Component<Props, State> {
     // ── API helpers ──────────────────────────────────────────
 
     private async loadDir(rawPath: string) {
+        // prevent concurrent navigation races
+        if (this.state.loading) return;
         // normalise: always start with /, never end with / (except root)
         let path = rawPath.replace(/\/+/g, '/');
         if (!path.startsWith('/')) path = '/' + path;
@@ -116,9 +118,9 @@ export class FileManager extends Component<Props, State> {
 
     // ── Navigation ───────────────────────────────────────────
 
-    private enter = (f: FileEntry) => {
+    private enter = (f: FileEntry, currentPath: string) => {
         if (!f.isDir) return;
-        const next = this.state.path === '/' ? `/${f.name}` : `${this.state.path}/${f.name}`;
+        const next = currentPath === '/' ? `/${f.name}` : `${currentPath}/${f.name}`;
         this.loadDir(next);
     };
 
@@ -446,7 +448,7 @@ export class FileManager extends Component<Props, State> {
                                     class={`fm-row${selected === f.name ? ' selected' : ''}`}
                                     onClick={() =>
                                         f.isDir
-                                            ? this.enter(f)
+                                            ? this.enter(f, path)
                                             : this.setState({ selected: f.name === selected ? null : f.name })
                                     }
                                 >
