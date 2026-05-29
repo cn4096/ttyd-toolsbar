@@ -2,7 +2,9 @@
  + 带自定义底部按钮网页版 `ssh ttyd`
   
   <img width="672" height="430" alt="image" src="https://github.com/user-attachments/assets/65d37a27-01c3-49fa-830e-06c263f5bae9" />
-+ 带文件管理，支持 新建/删除/重命名/编辑
+  
+ + 带文件管理，支持 新建/删除/重命名/编辑
+   
   <img width="1152" height="572" alt="image" src="https://github.com/user-attachments/assets/66dba695-f46c-4ae5-95f4-90d7f7a4f7a7" />
 <img width="1032" height="564" alt="image" src="https://github.com/user-attachments/assets/ba0c7482-7c9f-447f-b20a-1dc531626abe" />
 
