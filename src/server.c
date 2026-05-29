@@ -83,9 +83,10 @@ static const struct option options[] = {{"port", required_argument, NULL, 'p'},
                                         {"browser", no_argument, NULL, 'B'},
                                         {"debug", required_argument, NULL, 'd'},
                                         {"version", no_argument, NULL, 'v'},
+                                        {"file-root", required_argument, NULL, 'R'},
                                         {"help", no_argument, NULL, 'h'},
                                         {NULL, 0, 0, 0}};
-static const char *opt_string = "p:i:U:c:H:u:g:s:w:I:b:P:f:6aSC:K:A:Wt:T:Om:oqBd:vh";
+static const char *opt_string = "p:i:U:c:H:u:g:s:w:I:b:P:f:6aSC:K:A:Wt:T:Om:oqBd:R:vh";
 
 static void print_help() {
   // clang-format off
@@ -104,6 +105,7 @@ static void print_help() {
           "    -g, --gid               Group id to run with\n"
           "    -s, --signal            Signal to send to the command when exit it (default: 1, SIGHUP)\n"
           "    -w, --cwd               Working directory to be set for the child program\n"
+          "    -R, --file-root         Root directory for file manager (enables /files API)\n"
           "    -a, --url-arg           Allow client to send command line arguments in URL (eg: http://localhost:7681?arg=foo&arg=bar)\n"
           "    -W, --writable          Allow clients to write to the TTY (readonly by default)\n"
           "    -t, --client-option     Send option to client (format: key=value), repeat to add more options\n"
@@ -158,6 +160,7 @@ static void print_config() {
   if (server->exit_no_conn) lwsl_notice("  exit_no_conn: true\n");
   if (server->index != NULL) lwsl_notice("  custom index.html: %s\n", server->index);
   if (server->cwd != NULL) lwsl_notice("  working directory: %s\n", server->cwd);
+  if (server->file_root != NULL) lwsl_notice("  file-root: %s\n", server->file_root);
   if (!server->writable) lwsl_warn("The --writable option is not set, will start in readonly mode\n");
 }
 
@@ -425,6 +428,19 @@ int main(int argc, char **argv) {
       case 'w':
         server->cwd = strdup(optarg);
         break;
+      case 'R': {
+        char resolved[4096];
+        if (realpath(optarg, resolved) == NULL) {
+          fprintf(stderr, "ttyd: --file-root: cannot resolve path: %s\n", optarg);
+          return -1;
+        }
+        struct stat frs;
+        if (stat(resolved, &frs) != 0 || !S_ISDIR(frs.st_mode)) {
+          fprintf(stderr, "ttyd: --file-root: not a directory: %s\n", optarg);
+          return -1;
+        }
+        server->file_root = strdup(resolved);
+      } break;
       case 'I':
         if (!strncmp(optarg, "~/", 2)) {
           const char *home = getenv("HOME");

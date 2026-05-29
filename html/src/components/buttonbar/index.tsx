@@ -11,6 +11,8 @@ export interface ButtonConfig {
 
 interface Props {
     onSendCommand: (data: string | Uint8Array) => void;
+    activeTab: 'terminal' | 'files';
+    onTabChange: (tab: 'terminal' | 'files') => void;
 }
 
 interface State {
@@ -231,7 +233,7 @@ export class ButtonBar extends Component<Props, State> {
     }
 
     render(
-        _: Props,
+        { activeTab, onTabChange }: Props,
         {
             buttons,
             editMode,
@@ -300,6 +302,25 @@ export class ButtonBar extends Component<Props, State> {
                         title={editMode ? 'Exit edit mode' : 'Edit buttons'}
                     >
                         ✎
+                    </button>
+
+                    {/* separator */}
+                    <span style="display:inline-block;width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0" />
+
+                    {/* tab buttons */}
+                    <button
+                        class={`ttyd-btn-tab${activeTab === 'terminal' ? ' active' : ''}`}
+                        onClick={() => onTabChange('terminal')}
+                        title="Terminal"
+                    >
+                        ⌨
+                    </button>
+                    <button
+                        class={`ttyd-btn-tab${activeTab === 'files' ? ' active' : ''}`}
+                        onClick={() => onTabChange('files')}
+                        title="File manager"
+                    >
+                        📁
                     </button>
                 </div>
 

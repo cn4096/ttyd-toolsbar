@@ -1,0 +1,44 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+
+#define FILE_API_MAX_UPLOAD  (30 * 1024 * 1024)   /* 30 MB */
+#define FILE_API_PATH_MAX    4096
+
+/* safe-join: resolve path under root, return false if traversal detected */
+bool file_api_safe_path(const char *root, const char *rel, char *out, size_t outsz);
+
+/* GET /files?path=...   → JSON listing */
+int file_api_list(struct lws *wsi, const char *root, const char *rel_path);
+
+/* GET /file/download?path=...  → stream file */
+int file_api_download(struct lws *wsi, const char *root, const char *rel_path);
+
+/* POST /file/delete   body: {"path":"..."} */
+int file_api_delete(struct lws *wsi, const char *root, const char *body, size_t body_len);
+
+/* POST /file/rename   body: {"from":"...","to":"..."} */
+int file_api_rename(struct lws *wsi, const char *root, const char *body, size_t body_len);
+
+/* POST /file/upload?path=...  multipart handled by pss_upload state machine */
+
+/* pss for upload state (embed in pss_http) */
+typedef struct {
+    char        dest_path[FILE_API_PATH_MAX];
+    FILE       *fp;
+    size_t      received;
+    bool        header_done;
+    /* boundary parser state */
+    char        boundary[128];
+    int         boundary_len;
+    bool        in_file_data;
+    char        leftover[512];
+    int         leftover_len;
+} upload_state_t;
+
+int file_api_upload_begin(struct lws *wsi, const char *root,
+                          const char *rel_path, const char *content_type,
+                          upload_state_t *up);
+int file_api_upload_body(upload_state_t *up, const char *data, size_t len);
+int file_api_upload_end(struct lws *wsi, upload_state_t *up);
