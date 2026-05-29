@@ -42,7 +42,15 @@ ttyd -W -p 7681 bash
 加 `-W` 才能在浏览器里实际输入命令。
 
 ---
+**启用文件管理器**
+```
+# 启用文件管理器（必须指定 --file-root）
+ttyd -W -p 7681 --file-root /opt/app bash
 
+# 加密码保护
+ttyd -W -p 7681 -c admin:123456 --file-root /opt/app bash
+
+```
 **指定端口 + 用户名密码**
 ```bash
 ttyd -W -p 8080 -c admin:123456 bash
