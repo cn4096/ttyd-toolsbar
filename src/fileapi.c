@@ -86,7 +86,7 @@ bool file_api_safe_path(const char *root, const char *rel,
     return true;
 }
 
-/* send a simple JSON response */
+/* send a simple JSON response and close the connection */
 static int send_json(struct lws *wsi, int http_status,
                      const char *body, size_t body_len) {
     unsigned char hdr[LWS_PRE + 512], *p = hdr + LWS_PRE,
@@ -101,6 +101,12 @@ static int send_json(struct lws *wsi, int http_status,
             wsi, WSI_TOKEN_HTTP_ACCESS_CONTROL_ALLOW_ORIGIN,
             (unsigned char *)"*", 1, &p, end))
         return 1;
+    /* Connection: close — tells browser not to reuse this connection,
+       so it won't wait for keep-alive timeout after upload */
+    if (lws_add_http_header_by_name(wsi,
+            (const unsigned char *)"connection:",
+            (const unsigned char *)"close", 5, &p, end))
+        return 1;
     if (lws_add_http_header_content_length(wsi, (unsigned long)body_len,
                                            &p, end))
         return 1;
@@ -113,8 +119,9 @@ static int send_json(struct lws *wsi, int http_status,
     memcpy(buf + LWS_PRE, body, body_len);
     lws_write(wsi, buf + LWS_PRE, body_len, LWS_WRITE_HTTP);
     free(buf);
-    (void)lws_http_transaction_completed(wsi);
-    return 0;
+    /* lws_http_transaction_completed returns 1 when it closes the wsi,
+       return that value so the callback chain knows to stop */
+    return lws_http_transaction_completed(wsi) ? -1 : 0;
 }
 
 static int send_error(struct lws *wsi, int code, const char *msg) {
@@ -347,11 +354,6 @@ int file_api_upload_end(struct lws *wsi, upload_state_t *up) {
     if (up->fp) {
         fclose(up->fp);
         up->fp = NULL;
-    }
-
-    if (up->received == 0) {
-        unlink(up->dest_path);
-        return send_error(wsi, HTTP_STATUS_BAD_REQUEST, "empty file");
     }
 
     char msg[256];
