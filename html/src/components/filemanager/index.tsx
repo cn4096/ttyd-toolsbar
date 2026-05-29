@@ -22,13 +22,34 @@ interface State {
     uploading: boolean;
     uploadLabel: string;
     uploadPct: number;
-    // modals
     modal: 'rename' | 'delete' | 'conflict' | null;
     modalFile: FileEntry | null;
     renameValue: string;
-    // pending upload queue for conflict resolution
     pendingFiles: File[];
     pendingIdx: number;
+}
+
+// ── Path utilities ──────────────────────────────────────────
+// Resolve a clean absolute path, collapsing .. and duplicate slashes.
+// Always returns a path starting with / and no trailing slash (except root).
+function resolvePath(base: string, rel: string): string {
+    // build absolute input
+    const abs = rel.startsWith('/') ? rel : `${base}/${rel}`;
+    const parts = abs.split('/').filter(Boolean);
+    const stack: string[] = [];
+    for (const p of parts) {
+        if (p === '..') {
+            stack.pop();
+        } else if (p !== '.') {
+            stack.push(p);
+        }
+    }
+    return '/' + stack.join('/');
+}
+
+// Join current path + child name into a clean absolute path
+function joinPath(dir: string, name: string): string {
+    return resolvePath(dir, name);
 }
 
 function fmtSize(bytes: number): string {
@@ -43,7 +64,7 @@ function fmtDate(ts: number): string {
 }
 
 export class FileManager extends Component<Props, State> {
-    private navSeq = 0; // increment on each navigation to discard stale responses
+    private navSeq = 0;
 
     constructor(props: Props) {
         super(props);
@@ -75,38 +96,55 @@ export class FileManager extends Component<Props, State> {
         }
     }
 
-    // ── API helpers ──────────────────────────────────────────
+    // ── Navigation ───────────────────────────────────────────
 
-    private async loadDir(rawPath: string) {
-        // normalise: always start with /, never end with / (except root)
-        let path = rawPath.replace(/\/+/g, '/');
-        if (!path.startsWith('/')) path = '/' + path;
-        if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-
-        // increment sequence — stale responses from older navigations will be ignored
+    private async loadDir(target: string) {
+        const path = resolvePath('/', target); // always clean absolute path
         const seq = ++this.navSeq;
         this.setState({ loading: true, error: '', selected: null, path });
         try {
             const r = await fetch(`/files?path=${encodeURIComponent(path)}`);
-            if (seq !== this.navSeq) return; // superseded by a newer navigation
+            if (seq !== this.navSeq) return;
             if (!r.ok) {
                 const j = await r.json();
                 this.setState({ error: j.error || 'Load failed', loading: false });
                 return;
             }
             const data = await r.json();
-            if (seq !== this.navSeq) return; // superseded
+            if (seq !== this.navSeq) return;
             const files: FileEntry[] = (data.files as FileEntry[]).sort((a, b) => {
                 if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
                 return a.name.localeCompare(b.name);
             });
             this.setState({ files, loading: false });
         } catch (e) {
-            if (seq === this.navSeq) {
-                this.setState({ error: String(e), loading: false });
-            }
+            if (seq === this.navSeq) this.setState({ error: String(e), loading: false });
         }
     }
+
+    private enterDir = (name: string) => {
+        // use current state.path for joining — it's always clean because loadDir resolves it
+        const next = joinPath(this.state.path, name);
+        this.loadDir(next);
+    };
+
+    private navUp = () => {
+        const next = resolvePath(this.state.path, '..');
+        this.loadDir(next);
+    };
+
+    private buildCrumbs(): { label: string; path: string }[] {
+        const parts = this.state.path.replace(/^\//, '').split('/').filter(Boolean);
+        const crumbs = [{ label: '/', path: '/' }];
+        let cur = '';
+        for (const p of parts) {
+            cur += `/${p}`;
+            crumbs.push({ label: p, path: cur });
+        }
+        return crumbs;
+    }
+
+    // ── API helpers ──────────────────────────────────────────
 
     private async apiPost(url: string, body: object): Promise<{ ok?: boolean; error?: string }> {
         try {
@@ -121,36 +159,13 @@ export class FileManager extends Component<Props, State> {
         }
     }
 
-    // ── Navigation ───────────────────────────────────────────
-
-    private enter = (f: FileEntry, currentPath: string) => {
-        if (!f.isDir) return;
-        const next = currentPath === '/' ? `/${f.name}` : `${currentPath}/${f.name}`;
-        this.loadDir(next);
-    };
-
-    private navTo = (path: string) => {
-        this.loadDir(path);
-    };
-
-    private buildCrumbs(): { label: string; path: string }[] {
-        const parts = this.state.path.replace(/^\//, '').split('/').filter(Boolean);
-        const crumbs = [{ label: '/', path: '/' }];
-        let cur = '';
-        for (const p of parts) {
-            cur += `/${p}`;
-            crumbs.push({ label: p, path: cur });
-        }
-        return crumbs;
-    }
-
     // ── Download ─────────────────────────────────────────────
 
     private download = (f: FileEntry, e: MouseEvent) => {
         e.stopPropagation();
-        const filePath = this.state.path === '/' ? `/${f.name}` : `${this.state.path}/${f.name}`;
+        const fp = joinPath(this.state.path, f.name);
         const a = document.createElement('a');
-        a.href = `/file/download?path=${encodeURIComponent(filePath)}`;
+        a.href = `/file/download?path=${encodeURIComponent(fp)}`;
         a.download = f.name;
         a.click();
     };
@@ -166,13 +181,10 @@ export class FileManager extends Component<Props, State> {
         const { modalFile, path } = this.state;
         if (!modalFile) return;
         this.setState({ modal: null });
-        const filePath = path === '/' ? `/${modalFile.name}` : `${path}/${modalFile.name}`;
-        const res = await this.apiPost('/file/delete', { path: filePath });
-        if (res.error) {
-            this.setState({ error: res.error });
-        } else {
-            this.loadDir(path);
-        }
+        const fp = joinPath(path, modalFile.name);
+        const res = await this.apiPost('/file/delete', { path: fp });
+        if (res.error) this.setState({ error: res.error });
+        else this.loadDir(path);
     };
 
     // ── Rename ───────────────────────────────────────────────
@@ -186,14 +198,11 @@ export class FileManager extends Component<Props, State> {
         const { modalFile, renameValue, path } = this.state;
         if (!modalFile || !renameValue.trim()) return;
         this.setState({ modal: null });
-        const from = path === '/' ? `/${modalFile.name}` : `${path}/${modalFile.name}`;
-        const to = path === '/' ? `/${renameValue.trim()}` : `${path}/${renameValue.trim()}`;
+        const from = joinPath(path, modalFile.name);
+        const to = joinPath(path, renameValue.trim());
         const res = await this.apiPost('/file/rename', { from, to });
-        if (res.error) {
-            this.setState({ error: res.error });
-        } else {
-            this.loadDir(path);
-        }
+        if (res.error) this.setState({ error: res.error });
+        else this.loadDir(path);
     };
 
     // ── Upload ───────────────────────────────────────────────
@@ -233,7 +242,6 @@ export class FileManager extends Component<Props, State> {
             return;
         }
         const file = pendingFiles[pendingIdx];
-        // conflict check
         const exists = files.some(f => f.name === file.name);
         if (exists) {
             this.setState({ modal: 'conflict', pendingIdx });
@@ -242,39 +250,34 @@ export class FileManager extends Component<Props, State> {
         }
     }
 
-    // User chose to overwrite
     private conflictOverwrite = () => {
         const { pendingFiles, pendingIdx } = this.state;
-        const file = pendingFiles[pendingIdx];
         this.setState({ modal: null });
-        this.doUpload(file, file.name);
+        this.doUpload(pendingFiles[pendingIdx], pendingFiles[pendingIdx].name);
     };
 
-    // User chose to rename old file, then upload with original name
     private conflictRenameOld = async () => {
         const { pendingFiles, pendingIdx, path } = this.state;
         const file = pendingFiles[pendingIdx];
         this.setState({ modal: null });
 
-        // Generate a unique name for the old file: name_20060102_150405.ext
         const now = new Date();
         const pad = (n: number) => String(n).padStart(2, '0');
         const ymd = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
         const hms = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
         const ts = `${ymd}_${hms}`;
         const dot = file.name.lastIndexOf('.');
-        const baseName = dot > 0 ? file.name.slice(0, dot) : file.name;
+        const base = dot > 0 ? file.name.slice(0, dot) : file.name;
         const ext = dot > 0 ? file.name.slice(dot) : '';
-        const newOldName = `${baseName}_${ts}${ext}`;
+        const newOldName = `${base}_${ts}${ext}`;
 
-        const from = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
-        const to = path === '/' ? `/${newOldName}` : `${path}/${newOldName}`;
-        await this.apiPost('/file/rename', { from, to });
-
+        await this.apiPost('/file/rename', {
+            from: joinPath(path, file.name),
+            to: joinPath(path, newOldName),
+        });
         this.doUpload(file, file.name);
     };
 
-    // Skip this file
     private conflictSkip = () => {
         const { pendingFiles, pendingIdx, path } = this.state;
         const nextIdx = pendingIdx + 1;
@@ -292,25 +295,18 @@ export class FileManager extends Component<Props, State> {
         const { path, pendingFiles, pendingIdx } = this.state;
         const MAX = 30 * 1024 * 1024;
         if (file.size > MAX) {
-            this.setState(
-                {
-                    error: `${file.name}: exceeds 30 MB limit`,
-                    pendingIdx: pendingIdx + 1,
-                },
-                () => this.processNextUpload()
+            this.setState({ error: `${file.name}: exceeds 30 MB limit`, pendingIdx: pendingIdx + 1 }, () =>
+                this.processNextUpload()
             );
             return;
         }
 
-        const destPath = path === '/' ? `/${destName}` : `${path}/${destName}`;
+        const destPath = joinPath(path, destName);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/file/upload?path=${encodeURIComponent(destPath)}`);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
 
-        this.setState({
-            uploading: true,
-            uploadLabel: `Uploading ${file.name}…`,
-            uploadPct: 0,
-        });
+        this.setState({ uploading: true, uploadLabel: `Uploading ${file.name}…`, uploadPct: 0 });
 
         xhr.upload.onprogress = ev => {
             if (ev.lengthComputable) {
@@ -320,26 +316,15 @@ export class FileManager extends Component<Props, State> {
 
         xhr.onload = () => {
             const nextIdx = pendingIdx + 1;
-            this.setState(
-                {
-                    uploading: nextIdx < pendingFiles.length,
-                    pendingIdx: nextIdx,
-                },
-                () => this.processNextUpload()
+            this.setState({ uploading: nextIdx < pendingFiles.length, pendingIdx: nextIdx }, () =>
+                this.processNextUpload()
             );
         };
 
         xhr.onerror = () => {
-            this.setState({
-                error: `Upload failed: ${file.name}`,
-                uploading: false,
-                pendingFiles: [],
-                pendingIdx: 0,
-            });
+            this.setState({ error: `Upload failed: ${file.name}`, uploading: false, pendingFiles: [], pendingIdx: 0 });
         };
 
-        /* send as raw octet-stream — backend writes bytes directly to file */
-        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
         xhr.send(file);
     }
 
@@ -367,6 +352,7 @@ export class FileManager extends Component<Props, State> {
 
         const crumbs = this.buildCrumbs();
         const conflictFile = modal === 'conflict' ? pendingFiles[pendingIdx] : null;
+        const isRoot = path === '/';
 
         return (
             <div class="fm-wrap">
@@ -380,7 +366,7 @@ export class FileManager extends Component<Props, State> {
                                 {isLast ? (
                                     <span class="crumb-cur">{c.label}</span>
                                 ) : (
-                                    <span onClick={() => this.navTo(c.path)}>{c.label}</span>
+                                    <span onClick={() => this.loadDir(c.path)}>{c.label}</span>
                                 )}
                             </span>
                         );
@@ -392,28 +378,17 @@ export class FileManager extends Component<Props, State> {
                     <label>
                         <input type="file" multiple style="display:none" onChange={this.handleFileInput} />
                         <button
-                            onClick={e => {
-                                (e.currentTarget as HTMLButtonElement).previousElementSibling &&
-                                    (
-                                        (e.currentTarget as HTMLButtonElement)
-                                            .previousElementSibling as HTMLInputElement
-                                    ).click();
-                            }}
+                            onClick={e =>
+                                (
+                                    (e.currentTarget as HTMLButtonElement).previousElementSibling as HTMLInputElement
+                                ).click()
+                            }
                         >
                             ↑ Upload
                         </button>
                     </label>
                     <button onClick={() => this.loadDir(path)}>↻ Refresh</button>
-                    {path !== '/' && (
-                        <button
-                            onClick={() => {
-                                const parent = path.slice(0, path.lastIndexOf('/')) || '/';
-                                this.navTo(parent);
-                            }}
-                        >
-                            ↑ Up
-                        </button>
-                    )}
+                    {!isRoot && <button onClick={this.navUp}>↑ Up</button>}
                     <span class="fm-spacer" />
                     {error && <span style="color:#f54235;font-size:11px">{error}</span>}
                     <span class="fm-status">{files.length} items</span>
@@ -451,11 +426,13 @@ export class FileManager extends Component<Props, State> {
                                 <div
                                     key={f.name}
                                     class={`fm-row${selected === f.name ? ' selected' : ''}`}
-                                    onClick={() =>
-                                        f.isDir
-                                            ? this.enter(f, path)
-                                            : this.setState({ selected: f.name === selected ? null : f.name })
-                                    }
+                                    onClick={() => {
+                                        if (f.isDir) {
+                                            this.enterDir(f.name);
+                                        } else {
+                                            this.setState({ selected: f.name === selected ? null : f.name });
+                                        }
+                                    }}
                                 >
                                     <span class="fm-icon">{f.isDir ? '📁' : '📄'}</span>
                                     <span class="fm-name" title={f.name}>
@@ -482,7 +459,7 @@ export class FileManager extends Component<Props, State> {
                     </div>
                 </div>
 
-                {/* ── Modal: Rename ── */}
+                {/* Modal: Rename */}
                 {modal === 'rename' && modalFile && (
                     <div class="fm-modal-overlay" onClick={() => this.setState({ modal: null })}>
                         <div class="fm-modal" onClick={e => e.stopPropagation()}>
@@ -509,7 +486,7 @@ export class FileManager extends Component<Props, State> {
                     </div>
                 )}
 
-                {/* ── Modal: Delete ── */}
+                {/* Modal: Delete */}
                 {modal === 'delete' && modalFile && (
                     <div class="fm-modal-overlay" onClick={() => this.setState({ modal: null })}>
                         <div class="fm-modal" onClick={e => e.stopPropagation()}>
@@ -530,14 +507,13 @@ export class FileManager extends Component<Props, State> {
                     </div>
                 )}
 
-                {/* ── Modal: Conflict ── */}
+                {/* Modal: Conflict */}
                 {modal === 'conflict' && conflictFile && (
                     <div class="fm-modal-overlay">
                         <div class="fm-modal">
                             <div class="fm-modal-title">File already exists</div>
                             <div class="fm-modal-msg">
-                                <strong>{conflictFile.name}</strong> already exists in this directory. What would you
-                                like to do?
+                                <strong>{conflictFile.name}</strong> already exists. What would you like to do?
                             </div>
                             <div class="fm-modal-actions" style="flex-wrap:wrap;gap:6px">
                                 <button class="btn-cancel" onClick={this.conflictSkip}>
