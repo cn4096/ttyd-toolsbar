@@ -210,8 +210,13 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
             pss->buffer = NULL;
             return rc;
           }
-          /* body comes in LWS_CALLBACK_HTTP_BODY */
-          lws_callback_on_writable(wsi);
+          /* body chunks arrive in LWS_CALLBACK_HTTP_BODY;
+             do NOT call lws_callback_on_writable here — that would
+             trigger LWS_CALLBACK_HTTP_WRITEABLE with ptr==NULL which
+             jumps to try_to_reuse → lws_http_transaction_completed,
+             ending the transaction before any body is received and
+             leaving the browser waiting for a response until the
+             keep-alive timeout fires (~5 s). */
           break;
         }
 

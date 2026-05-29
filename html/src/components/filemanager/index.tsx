@@ -561,7 +561,14 @@ export class FileManager extends Component<Props, State> {
 
         xhr.upload.onprogress = ev => {
             if (ev.lengthComputable) {
-                this.setState({ uploadPct: Math.round((ev.loaded / ev.total) * 100) });
+                const pct = Math.round((ev.loaded / ev.total) * 100);
+                this.setState({
+                    uploadPct: pct,
+                    // Once all bytes are sent, the server still needs to flush
+                    // the file and send its response. Show a different label so
+                    // the user knows we're waiting for the server, not stuck.
+                    uploadLabel: pct >= 100 ? `Waiting for server… ${file.name}` : `Uploading ${file.name}…`,
+                });
             }
         };
 
