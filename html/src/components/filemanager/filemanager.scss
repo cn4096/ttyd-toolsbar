@@ -1,9 +1,19 @@
+// ── VSCode Dark+ colour tokens ───────────────────────────────────────────────
+// bg-base:      #1e1e1e   (editor / list area)
+// bg-sidebar:   #252526   (panels, breadcrumb, toolbar)
+// bg-hover:     #2a2d2e   (row hover)
+// bg-selected:  #094771   (row selected — VSCode blue selection)
+// fg-primary:   #cccccc   (main text)
+// fg-secondary: #858585   (size, mtime)
+// fg-path:      #569cd6   (breadcrumb links — VSCode blue)
+// border:       #3c3c3c
+
 .fm-wrap {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #141414;
-  color: #d2d2d2;
+  background: #1e1e1e;
+  color: #cccccc;
   font-size: 13px;
   font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   overflow: hidden;
@@ -15,22 +25,22 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 2px;
-  padding: 6px 10px;
-  border-bottom: 1px solid #2a2a2a;
-  background: #1a1a1a;
-  min-height: 34px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #3c3c3c;
+  background: #252526;
+  min-height: 32px;
   flex-shrink: 0;
 
   span {
     cursor: pointer;
-    color: #4d9cf4;
-    padding: 1px 3px;
+    color: #569cd6;
+    padding: 1px 4px;
     border-radius: 3px;
-    &:hover { background: #2a2a2a; }
+    &:hover { background: #2a2d2e; color: #9cdcfe; }
   }
 
   .sep { color: #555; padding: 0 2px; cursor: default; }
-  .crumb-cur { color: #d2d2d2; cursor: default; }
+  .crumb-cur { color: #cccccc; cursor: default; }
 }
 
 /* toolbar */
@@ -39,24 +49,24 @@
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid #3c3c3c;
+  background: #252526;
   flex-shrink: 0;
 
   button {
-    background: #2d2d2d;
-    border: 1px solid #3a3a3a;
-    color: #c0c0c0;
-    border-radius: 4px;
+    background: #3a3d41;
+    border: 1px solid #3c3c3c;
+    color: #cccccc;
+    border-radius: 3px;
     padding: 3px 10px;
     font-size: 12px;
     cursor: pointer;
-    &:hover { background: #3a3a3a; color: #fff; }
-    &:active { background: #4d9cf4; color: #fff; border-color: #4d9cf4; }
-    &.danger:hover { background: #4a1a1a; color: #f54235; border-color: #6a2a2a; }
+    &:hover { background: #45494e; color: #fff; border-color: #555; }
+    &:active { background: #0e639c; color: #fff; border-color: #0e639c; }
   }
 
   .fm-spacer { flex: 1; }
-  .fm-status { font-size: 11px; color: #555; }
+  .fm-status { font-size: 11px; color: #6a6a6a; }
 }
 
 /* file list */
@@ -65,6 +75,12 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+
+  // VSCode-style scrollbar
+  &::-webkit-scrollbar       { width: 10px; }
+  &::-webkit-scrollbar-track { background: #1e1e1e; }
+  &::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px;
+                                &:hover { background: #555; } }
 }
 
 .fm-drop-zone {
@@ -78,11 +94,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(77, 156, 244, 0.12);
-    border: 2px dashed #4d9cf4;
-    border-radius: 6px;
-    font-size: 16px;
-    color: #4d9cf4;
+    background: rgba(14, 99, 156, 0.15);
+    border: 2px dashed #007fd4;
+    border-radius: 4px;
+    font-size: 15px;
+    color: #9cdcfe;
     z-index: 10;
     pointer-events: none;
   }
@@ -93,7 +109,7 @@
   align-items: center;
   justify-content: center;
   height: 120px;
-  color: #444;
+  color: #555;
   font-size: 13px;
 }
 
@@ -101,20 +117,21 @@
 .fm-row {
   display: flex;
   align-items: center;
-  padding: 5px 10px;
-  border-bottom: 1px solid #1e1e1e;
+  padding: 4px 10px;
+  border-bottom: 1px solid #252526;
   cursor: pointer;
   user-select: none;
   gap: 6px;
-  transition: background 0.08s;
+  transition: background 0.06s;
 
-  &:hover { background: #1e1e1e; }
-  &.selected { background: #1d2f44; }
+  &:hover   { background: #2a2d2e; }
+  &.selected { background: #094771; }
 
-  .fm-icon { font-size: 14px; flex-shrink: 0; width: 18px; text-align: center; }
-  .fm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fm-size { font-size: 11px; color: #555; min-width: 70px; text-align: right; flex-shrink: 0; }
-  .fm-mtime { font-size: 11px; color: #444; min-width: 130px; text-align: right; flex-shrink: 0; }
+  .fm-icon  { font-size: 14px; flex-shrink: 0; width: 18px; text-align: center; }
+  .fm-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+               color: #cccccc; }
+  .fm-size  { font-size: 11px; color: #6a6a6a; min-width: 70px; text-align: right; flex-shrink: 0; }
+  .fm-mtime { font-size: 11px; color: #555;    min-width: 130px; text-align: right; flex-shrink: 0; }
 
   .fm-acts {
     display: none;
@@ -124,15 +141,15 @@
   &:hover .fm-acts, &.selected .fm-acts { display: flex; }
 
   .fm-act {
-    background: #2d2d2d;
-    border: 1px solid #3a3a3a;
-    color: #888;
+    background: #3a3d41;
+    border: 1px solid #3c3c3c;
+    color: #858585;
     border-radius: 3px;
     padding: 1px 6px;
     font-size: 11px;
     cursor: pointer;
-    &:hover { color: #ccc; background: #3a3a3a; }
-    &.del:hover { color: #f54235; border-color: #6a2a2a; background: #2a1010; }
+    &:hover { color: #cccccc; background: #45494e; border-color: #555; }
+    &.del:hover { color: #f48771; border-color: #5a2020; background: #3a1818; }
   }
 }
 
@@ -269,26 +286,50 @@
   .fm-acts { display: flex !important; }
 }
 
-// ─── Text editor modal ───────────────────────────────────────────────────────
+// ─── Text editor modal ─────────────────────────────────────────────────────
+// VSCode Dark+ inspired: #252526 dialog, #1e1e1e editor, #9cdcfe text
+
 .fm-modal-editor {
-  width: min(860px, calc(100vw - 24px));
-  max-height: 90vh;
+  width: min(880px, calc(100vw - 24px));
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  // override base modal background with VSCode sidebar grey
+  background: #252526 !important;
+  border-color: #3c3c3c !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85) !important;
+
+  .fm-modal-title {
+    font-size: 13px;
+    color: #cccccc;
+    border-bottom: 1px solid #3c3c3c;
+    padding-bottom: 8px;
+    margin-bottom: 2px;
+    font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  }
+
+  // override Save button to VSCode blue
+  .btn-ok {
+    background: #0e639c;
+    &:hover { background: #1177bb; }
+  }
 }
 
 .fm-editor-textarea {
   flex: 1;
-  min-height: 55vh;
-  background: #0d0d0d;
-  border: 1px solid #2a2a2a;
-  border-radius: 4px;
-  color: #d2d2d2;
-  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  min-height: 58vh;
+  // VSCode editor background
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 3px;
+  // VSCode variable colour: cyan-green #9cdcfe
+  color: #9cdcfe;
+  caret-color: #aeafad;
+  font-family: 'Cascadia Code', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 13px;
-  line-height: 1.6;
-  padding: 10px 12px;
+  line-height: 1.65;
+  padding: 12px 16px;
   resize: vertical;
   outline: none;
   tab-size: 4;
@@ -299,12 +340,20 @@
   -webkit-appearance: none;
 
   &:focus {
-    border-color: #3a3a3a;
+    border-color: #007fd4;
+    box-shadow: 0 0 0 1px #007fd4;
   }
+
+  // scrollbar VSCode style
+  &::-webkit-scrollbar        { width: 10px; height: 10px; }
+  &::-webkit-scrollbar-track  { background: #1e1e1e; }
+  &::-webkit-scrollbar-thumb  { background: #424242; border-radius: 5px;
+                                  &:hover { background: #555; } }
 }
 
 .fm-editor-tip {
   font-size: 10px;
-  color: #333;
+  color: #555;
   text-align: center;
+  letter-spacing: 0.03em;
 }
