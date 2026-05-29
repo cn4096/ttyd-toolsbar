@@ -319,10 +319,10 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
       /* upload */
       if (path_is(pss->path, "/file/upload")) {
         upload_state_t *up = (upload_state_t *)pss->buffer;
-        int rc = file_api_upload_end(wsi, up);
+        file_api_upload_end(wsi, up);
         free(up);
         pss->buffer = NULL;
-        return rc;
+        return -1;  /* close connection immediately after upload response */
       }
 
       /* null-terminate accumulated body */

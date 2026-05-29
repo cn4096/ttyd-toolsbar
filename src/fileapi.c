@@ -113,7 +113,7 @@ static int send_json(struct lws *wsi, int http_status,
     memcpy(buf + LWS_PRE, body, body_len);
     lws_write(wsi, buf + LWS_PRE, body_len, LWS_WRITE_HTTP);
     free(buf);
-(void)lws_http_transaction_completed(wsi);
+    (void)lws_http_transaction_completed(wsi);
     return 0;
 }
 
